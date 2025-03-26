@@ -4,7 +4,7 @@ import {
   createNotification,
   getNotifications,
   markAsRead,
-} from "../middleware/notificationMiddleware";
+} from "../controllers/notification.controller";
 
 const router = Router();
 

@@ -6,7 +6,6 @@ import logger from "./utils/logger.utils";
 import { Request, Response, NextFunction } from "express";
 import { notFoundMiddleware } from "./middleware/notFoundMiddleware";
 import appRoute from "./routes";
-import router from "./routes/notification.route";
 
 dotenv.config();
 
@@ -29,7 +28,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use("/api/", appRoute());
 
 app.use(notFoundMiddleware);
-app.use("/notifications", router);
 
 app.listen(process.env.PORT, async () => {
   await connectToDB(DB_CONNECTION_STRING);

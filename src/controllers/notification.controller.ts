@@ -1,9 +1,9 @@
 // src/controllers/notification.controller.ts
-import { Request, Response } from "express";
+import { Request, RequestHandler, Response } from "express";
 import Notification from "../model/notification.model";
 
 // Create a new notification
-export const createNotification = async (req: Request, res: Response) => {
+export const createNotification: RequestHandler = async (req, res) => {
   try {
     const { title, message, user, type } = req.body;
 
@@ -16,9 +16,9 @@ export const createNotification = async (req: Request, res: Response) => {
     });
 
     await newNotification.save();
-    return res.status(201).json(newNotification);
+    res.status(201).json(newNotification);
   } catch (error) {
-    return res.status(500).json({
+    res.status(500).json({
       message: "Error creating notification",
       error: (error as Error).message,
     });
