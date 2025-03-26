@@ -6,6 +6,7 @@ import logger from './utils/logger.utils';
 import { Request, Response, NextFunction } from 'express';
 import { notFoundMiddleware } from './middleware/notFoundMiddleware';
 import appRoute from './routes';
+import publicCapsulesRoutes from './routes/publicCapsules';
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 app.use('/api/', appRoute());
+app.use('/api/public-capsules', publicCapsulesRoutes);
 
 app.use(notFoundMiddleware);
 
