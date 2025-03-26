@@ -6,7 +6,7 @@ import logger from './utils/logger.utils';
 import { Request, Response, NextFunction } from 'express';
 import { notFoundMiddleware } from './middleware/notFoundMiddleware';
 import appRoute from './routes';
-import publicCapsulesRoutes from './routes/publicCapsules';
+import publicCapsulesRoutes from './routes/public-capsule.router';
 
 dotenv.config();
 
