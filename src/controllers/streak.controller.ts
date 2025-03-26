@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import { StreakService } from '../services/streak-service';
-import { ErrorHandler } from '../utils/errorHandler';
 
 
 export class StreakController {
@@ -27,7 +26,7 @@ export class StreakController {
         }
       });
     } catch (error) {
-      ErrorHandler.handleError(res, error);
+     console.log(error)
     }
   }
 
@@ -57,7 +56,7 @@ export class StreakController {
         milestones: streak.milestoneRewards
       });
     } catch (error) {
-      ErrorHandler.handleError(res, error);
+      console.log(error)
     }
   }
 }
