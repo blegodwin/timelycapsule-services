@@ -1,107 +1,152 @@
-import mongoose, { Model } from 'mongoose';
-import { Types } from 'mongoose';
+import mongoose, { Model } from "mongoose";
+import { Types } from "mongoose";
 
-
-interface ICapsule {
+interface ICapsule extends ICapsuleMethods {
   _id: Types.ObjectId;
-  title: string;
-  content: string;
-  media: string | null;
-  password: string | null;
+  creator: Types.ObjectId;
+  recipients: Types.ObjectId[];
+  unlockDate: Date;
+  expirationDate?: Date; // Optional
+  mediaUrls: string[];
+  message: string;
+  theme?: string; // Optional themes/templates
+  isPublic: boolean;
+  password?: string; // Optional password protection
+  status: "Pending" | "Unlocked" | "Expired";
   recipientEmail: string;
-  recipientLink: string;
-  unlockAt: Date;
-  expiresAt: Date;
-  createdBy: Types.ObjectId | null;  
-  isClaimed: boolean;
-  isGuest: boolean;
+  capsuleLink: string;
   createdAt: Date;
 }
 
-const CapsuleSchema = new mongoose.Schema<ICapsule>({
-  title: {
-    type: String,
-    required: true,
+const CapsuleSchema = new mongoose.Schema<ICapsule>(
+  {
+    creator: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    recipients: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: [],
+      },
+    ],
+    unlockDate: {
+      type: Date,
+      required: true,
+    },
+    expirationDate: {
+      type: Date,
+      required: false,
+    },
+    mediaUrls: {
+      type: [String],
+      default: [],
+    },
+    message: {
+      type: String,
+      required: true,
+    },
+    theme: {
+      type: String,
+      required: false,
+    },
+    isPublic: {
+      type: Boolean,
+      default: false,
+    },
+    password: {
+      type: String,
+      required: false,
+      select: false, // Won't be returned in queries by default
+    },
+    status: {
+      type: String,
+      enum: ["Pending", "Unlocked", "Expired"],
+      default: "Pending",
+    },
+    recipientEmail: {
+      type: String,
+      required: true,
+    },
+    capsuleLink: {
+      type: String,
+      required: true,
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
   },
-  content: {
-    type: String,
-    required: true,
-  },
-  media: {
-    type: String,
-    default: null,
-  },
-  password: {
-    type: String,
-    default: null,
-  },
-  recipientEmail: {
-    type: String,
-    required: true,
-  },
-  recipientLink: {
-    type: String,
-    required: true,
-  },
-  unlockAt: {
-    type: Date,
-    required: true,
-  },
-  expiresAt: {
-    type: Date,
-    required: true,
-  },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null,
-  },
-  isClaimed: {
-    type: Boolean,
-    default: false,
-  },
-  isGuest: {
-    type: Boolean,
-    default: false,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-}, {
-  
-  timestamps: true,
-  
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
-
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
+);
 
 interface ICapsuleMethods {
   isExpired(): boolean;
   isUnlocked(): boolean;
+  updateStatus(): Promise<void>;
 }
-
 
 interface CapsuleModel extends Model<ICapsule, object, ICapsuleMethods> {
   findByRecipientEmail(email: string): Promise<ICapsule[]>;
+  findByCreator(userId: Types.ObjectId): Promise<ICapsule[]>;
+  findPublicCapsules(): Promise<ICapsule[]>;
 }
 
-
-CapsuleSchema.methods.isExpired = function(): boolean {
-  return new Date() > this.expiresAt;
+// Instance methods
+CapsuleSchema.methods.isExpired = function (): boolean {
+  if (!this.expirationDate) return false;
+  return new Date() > this.expirationDate;
 };
 
-CapsuleSchema.methods.isUnlocked = function(): boolean {
-  return new Date() >= this.unlockAt;
+CapsuleSchema.methods.isUnlocked = function (): boolean {
+  return new Date() >= this.unlockDate;
 };
 
+CapsuleSchema.methods.updateStatus = async function (): Promise<void> {
+  console.log("Updating status..."); // Added logging
+  if (this.isExpired()) {
+    this.status = "Expired";
+  } else if (this.isUnlocked()) {
+    this.status = "Unlocked";
+  } else {
+    this.status = "Pending";
+  }
+  await this.save();
+  console.log("Status updated to:", this.status); // Added logging
+};
 
-CapsuleSchema.statics.findByRecipientEmail = function(email: string) {
+// Static methods
+CapsuleSchema.statics.findByRecipientEmail = function (email: string) {
   return this.find({ recipientEmail: email });
 };
 
+CapsuleSchema.statics.findByCreator = function (userId: Types.ObjectId) {
+  return this.find({ creator: userId });
+};
 
-const Capsule = mongoose.model<ICapsule, CapsuleModel>('Capsule', CapsuleSchema);
+CapsuleSchema.statics.findPublicCapsules = function () {
+  return this.find({ isPublic: true });
+};
 
-export default Capsule;
+// Middleware to update status before saving
+CapsuleSchema.pre<ICapsule>("save", function (next) {
+  if (this.isExpired()) {
+    this.status = "Expired";
+  } else if (this.isUnlocked()) {
+    this.status = "Unlocked";
+  } else {
+    this.status = "Pending";
+  }
+  next();
+});
+
+export const Capsule = mongoose.model<ICapsule, CapsuleModel>(
+  "Capsule",
+  CapsuleSchema
+);
