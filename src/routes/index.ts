@@ -2,6 +2,8 @@
 import express from "express";
 import authRouter from "./auth.router";
 import userRouter from "./user.router";
+import analyticRouter from "./analytic.router";
+
 import paymentRouter from "./payment.router";
 import subscriptionRouter from './subscription.router';
 import aiContentRouter from './ai-content.router';
@@ -11,10 +13,13 @@ import publicRouter from './public-capsule.router';
 import capsuleRouter from './capsule.routes';
 
 
+
 const router = express.Router();
 export default (): express.Router => {
   authRouter(router);
   userRouter(router);
+  //analyticRouter(router);
+
   paymentRouter(router);
   subscriptionRouter(router);
   aiContentRouter(router);
@@ -22,6 +27,7 @@ export default (): express.Router => {
   streakRouter(router);
   publicRouter(router);
   capsuleRouter(router);
+
 
   return router;
 };
