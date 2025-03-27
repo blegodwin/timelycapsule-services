@@ -1,3 +1,12 @@
+
+import { app } from "./app";
+import dotenv from "dotenv";
+import { connectToDB } from "./config/db";
+import { DB_CONNECTION_STRING } from "./constants";
+import logger from "./utils/logger.utils";
+import { Request, Response, NextFunction } from "express";
+import { notFoundMiddleware } from "./middleware/notFoundMiddleware";
+import appRoute from "./routes";
 import { app } from './app';
 import dotenv from 'dotenv';
 import { connectToDB } from './config/db';
@@ -8,10 +17,11 @@ import { notFoundMiddleware } from './middleware/notFoundMiddleware';
 import appRoute from './routes';
 import capsuleRoutes from './routes/capsule.routes';
 
+
 dotenv.config();
 
 app.use((req: Request, res: Response, next: NextFunction) => {
-  res.on('finish', () => {
+  res.on("finish", () => {
     const logMessage = `${req.method} ${req.url} ${res.statusCode}`;
 
     if (Object.keys(req.query).length) {
@@ -26,7 +36,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   });
   next();
 });
-app.use('/api/', appRoute());
+app.use("/api/", appRoute());
 
 app.use(notFoundMiddleware);
 
