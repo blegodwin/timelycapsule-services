@@ -1,4 +1,3 @@
-import subscriptionRouter from './subscription.router';
 import express from 'express';
 import authRouter from './auth.router';
 import userRouter from './user.router';
@@ -10,7 +9,6 @@ import capsuleRouter from './capsule.routes';
 
 const router = express.Router();
 export default (): express.Router => {
-  subscriptionRouter(router);
   authRouter(router);
   userRouter(router);
   aiContentRouter(router);
