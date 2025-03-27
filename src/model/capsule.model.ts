@@ -1,7 +1,7 @@
-import mongoose, { Model } from "mongoose";
-import { Types } from "mongoose";
+import mongoose, { Model } from 'mongoose';
+import { Types } from 'mongoose';
 
-interface ICapsule extends ICapsuleMethods {
+export interface ICapsule extends ICapsuleMethods {
   _id: Types.ObjectId;
   creator: Types.ObjectId;
   recipients: Types.ObjectId[];
@@ -12,23 +12,27 @@ interface ICapsule extends ICapsuleMethods {
   theme?: string; // Optional themes/templates
   isPublic: boolean;
   password?: string; // Optional password protection
-  status: "Pending" | "Unlocked" | "Expired";
+  status: 'Pending' | 'Unlocked' | 'Expired';
   recipientEmail: string;
   capsuleLink: string;
   createdAt: Date;
+  title: string;
+  views: number;
+  lockedAt: Date;
+  legendary: boolean;
 }
 
 const CapsuleSchema = new mongoose.Schema<ICapsule>(
   {
     creator: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     recipients: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+        ref: 'User',
         default: [],
       },
     ],
@@ -63,8 +67,8 @@ const CapsuleSchema = new mongoose.Schema<ICapsule>(
     },
     status: {
       type: String,
-      enum: ["Pending", "Unlocked", "Expired"],
-      default: "Pending",
+      enum: ['Pending', 'Unlocked', 'Expired'],
+      default: 'Pending',
     },
     recipientEmail: {
       type: String,
@@ -78,6 +82,10 @@ const CapsuleSchema = new mongoose.Schema<ICapsule>(
       type: Date,
       default: Date.now,
     },
+    title: { type: String, required: true },
+    views: { type: Number, default: 0 },
+    lockedAt: { type: Date, required: true },
+    legendary: { type: Boolean, default: false },
   },
   {
     timestamps: true,
@@ -109,16 +117,16 @@ CapsuleSchema.methods.isUnlocked = function (): boolean {
 };
 
 CapsuleSchema.methods.updateStatus = async function (): Promise<void> {
-  console.log("Updating status..."); // Added logging
+  console.log('Updating status...'); // Added logging
   if (this.isExpired()) {
-    this.status = "Expired";
+    this.status = 'Expired';
   } else if (this.isUnlocked()) {
-    this.status = "Unlocked";
+    this.status = 'Unlocked';
   } else {
-    this.status = "Pending";
+    this.status = 'Pending';
   }
   await this.save();
-  console.log("Status updated to:", this.status); // Added logging
+  console.log('Status updated to:', this.status); // Added logging
 };
 
 // Static methods
@@ -135,18 +143,18 @@ CapsuleSchema.statics.findPublicCapsules = function () {
 };
 
 // Middleware to update status before saving
-CapsuleSchema.pre<ICapsule>("save", function (next) {
+CapsuleSchema.pre<ICapsule>('save', function (next) {
   if (this.isExpired()) {
-    this.status = "Expired";
+    this.status = 'Expired';
   } else if (this.isUnlocked()) {
-    this.status = "Unlocked";
+    this.status = 'Unlocked';
   } else {
-    this.status = "Pending";
+    this.status = 'Pending';
   }
   next();
 });
 
 export const Capsule = mongoose.model<ICapsule, CapsuleModel>(
-  "Capsule",
+  'Capsule',
   CapsuleSchema
 );
