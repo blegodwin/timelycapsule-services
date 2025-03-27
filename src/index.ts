@@ -9,22 +9,6 @@ import appRoute from './routes';
 
 dotenv.config();
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  res.on('finish', () => {
-    const logMessage = `${req.method} ${req.url} ${res.statusCode}`;
-
-    if (Object.keys(req.query).length) {
-      logger.info(`${logMessage} - Query Params: ${JSON.stringify(req.query)}`);
-    }
-
-    if (req.body && Object.keys(req.body).length > 0) {
-      logger.info(`${logMessage} - Request Body: ${JSON.stringify(req.body)}`);
-    } else {
-      logger.info(logMessage);
-    }
-  });
-  next();
-});
 app.use('/api/', appRoute());
 
 app.use(notFoundMiddleware);
