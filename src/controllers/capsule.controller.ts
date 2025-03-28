@@ -2,10 +2,13 @@
 import { Request, Response } from "express";
 import * as capsuleService from "../services/capsule.service";
 import { handleResponse } from "../utils/responseHandler";
+import { contentModerationService } from "../services/contentModeration.service";
 
 export const createCapsule = async (req: Request, res: Response): Promise<void> => {
   try {
     const capsule = await capsuleService.createCapsule(req.body);
+    // Perform content moderation
+    await contentModerationService.moderateCapsule(capsule);
     handleResponse(res, 201, "Capsule created successfully", capsule);
   } catch (error) {
     handleResponse(res, 500, "Error creating capsule", error);
@@ -55,6 +58,8 @@ export const updateCapsule = async (req: Request, res: Response): Promise<void> 
       handleResponse(res, 404, "Capsule not found");
       return;
     }
+    // Re-run content moderation after update
+    await contentModerationService.moderateCapsule(capsule);
     handleResponse(res, 200, "Capsule updated", capsule);
   } catch (error) {
     handleResponse(res, 500, "Error updating capsule", error);
