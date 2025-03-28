@@ -12,6 +12,7 @@ import capsuleRouter from './capsule.routes';
 import contentModerationRouter from './content-moderation.router';
 import activityRouter from './activity.router';
 import followRouter from './follow.router';
+import leaderboardRoutes from "./routes/leaderboard.routes";
 
 const router = express.Router();
 export default (): express.Router => {
@@ -28,6 +29,7 @@ export default (): express.Router => {
   capsuleRouter(router);
   activityRouter(router);
   followRouter(router);
+  leaderboardRoutes(router);
   router.use('/moderation', contentModerationRouter);
 
   return router;
