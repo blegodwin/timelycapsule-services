@@ -10,6 +10,8 @@ import referralRouter from './referral-router';
 import publicRouter from './public-capsule.router';
 import capsuleRouter from './capsule.routes';
 import contentModerationRouter from './content-moderation.router';
+import activityRouter from './activity.router';
+import followRouter from './follow.router';
 
 const router = express.Router();
 export default (): express.Router => {
@@ -24,6 +26,8 @@ export default (): express.Router => {
   streakRouter(router);
   publicRouter(router);
   capsuleRouter(router);
+  activityRouter(router);
+  followRouter(router);
   router.use('/moderation', contentModerationRouter);
 
   return router;

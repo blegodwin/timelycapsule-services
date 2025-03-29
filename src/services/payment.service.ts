@@ -1,5 +1,6 @@
-import Payment, { IPayment } from "../model/payment.model";
+
 import { Types } from "mongoose";
+import Payment, { IPayment } from "../model/payment.model";
 
 export interface CreatePaymentData {
   userId: string;
