@@ -1,6 +1,5 @@
 node_modules
 ./dist
 dist/
-.env
 src/logs/
 .qodo
