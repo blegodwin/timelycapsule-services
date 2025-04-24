@@ -1,31 +1,36 @@
-import mongoose from 'mongoose';
+import mongoose, { ConnectOptions } from 'mongoose';
+import dotenv from 'dotenv';
+import logger from '../config/logger';
 
-export async function connectToDB(url: string) {
-  try {
-    console.log('Connecting to the database..');
-    await mongoose.connect(url, {
-      autoIndex: false,
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-      family: 4,
-    });
-    console.log('Connected to the database');
-    mongoose.connection.on('error', (err) => {
-      console.error('Database connection error: ', err);
-    });
-    mongoose.connection.on('disconnected', () => {
-      console.warn('Database connection lost. Reconnecting...');
-      connectToDB(url);
-    });
-  } catch (error) {
-    console.error('Error connecting to the database: ', error);
-    process.exit(1); // Exit the process with failure
-  }
-}
+dotenv.config();
 
-export async function disconnectFromDataBase() {
-  await mongoose.connection.close();
-  console.log('Disconnected from the database');
-  return;
+export async function connectDB() {
+  const db =
+    (process.env.NODE_ENV === 'development'
+      ? process.env.LOCAL_MONGO_URL
+      : process.env.PROD_MONGO_URL) ?? ' ';
+
+  await mongoose
+    .connect(db, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    } as ConnectOptions)
+    .then(() => {
+      logger.info(
+        '<-----x----------------------------------------------------------->'
+      );
+      logger.info('Successfully connected to a database');
+      logger.info(
+        '<---------------------------------------------------------------->'
+      );
+    })
+    .catch((error) => {
+      logger.info(
+        '<---------------------------------------------------------------->'
+      );
+      logger.fatal('Error connecting to database', 'connection failed ', error);
+      logger.info(
+        '<---------------------------------------------------------------->'
+      );
+    });
 }
