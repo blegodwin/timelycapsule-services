@@ -2,6 +2,8 @@
 
 TimelyCapsule is a web-based application that empowers users to create, seal, and send time-locked messages or media capsules. These capsules unlock at a specified date and time and can include text, images, videos, or cryptocurrency payments. The application is designed to provide an engaging and customizable experience while maintaining flexibility for both registered and guest users.
 
+NB: .env is currently commited to the repo containing the required development credentials.
+
 ## Features
 
 - Create and send time-locked messages or media capsules
