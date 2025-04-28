@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { validationResult } from 'express-validator';
-import { User } from '../models/user.model';
+import jwt from 'jsonwebtoken';
 import { generateToken } from '../utils/jwt';
+import User from '../models/user.model';
 
 // POST /auth/register
 export const register = async (req: Request, res: Response): Promise<void> => {
@@ -12,7 +13,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  const { email, password, displayName } = req.body;
+  const { email, password, displayName, roles } = req.body;
 
   try {
     const existingUser = await User.findOne({ email });
@@ -24,17 +25,34 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    const newUser = await User.create({
+    const user = await User.create({
       email,
       passwordHash,
       displayName,
-      roles: ['user'],
+      roles: roles || "user",
       guest: false,
       isVerified: false,
     });
+    await user.save();
 
-    const token = generateToken(newUser.id);
-    res.status(201).json({ token });
+    const token = jwt.sign(
+      { _id: user._id, displayName: user.displayName, email: user.email, role: user.roles, guest: user.guest, isVerified: user.isVerified },
+      process.env.JWT_SECRET as string,
+      { expiresIn: '1d' }
+    );
+    res.status(201).json({
+      message: 'User registered successfully',
+      user: {
+        _id: user._id,
+        displayName: user.displayName,
+        email: user.email,
+        role: user.roles,
+        guest: user.guest,
+        isVerified: user.isVerified,
+      },
+      token,
+    });
+
   } catch (error) {
     console.error(error);
     res.status(500).send('Server error');
@@ -67,8 +85,23 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     user.lastLoginAt = new Date();
     await user.save();
 
-    const token = generateToken(user.id);
-    res.json({ token });
+    const token = jwt.sign(
+      { _id: user._id, displayName: user.displayName, email: user.email, role: user.roles, guest: user.guest, isVerified: user.isVerified },
+      process.env.JWT_SECRET as string,
+      { expiresIn: '1d' }
+    );
+    res.status(201).json({
+      message: 'User Login successfully',
+      user: {
+        _id: user._id,
+        displayName: user.displayName,
+        email: user.email,
+        role: user.roles,
+        guest: user.guest,
+        isVerified: user.isVerified,
+      },
+      token,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).send('Server error');

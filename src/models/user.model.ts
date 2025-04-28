@@ -1,10 +1,16 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+
+export enum UserRole {
+  ADMIN = 'admin',
+  USER = 'user',
+  GUEST = 'guest'
+}
 export interface IUser extends Document {
   email: string | null;
   passwordHash: string | null;
   displayName: string;
-  roles: string[];
+  roles: UserRole;
   guest: boolean;
   isVerified: boolean;
   provider: 'local' | 'google' | 'github' | null;
@@ -17,7 +23,11 @@ const userSchema = new Schema<IUser>({
   email: { type: String, default: null },
   passwordHash: { type: String, default: null },
   displayName: { type: String, required: true },
-  roles: { type: [String], default: ['user'] },
+  roles: {
+    type: String,
+    enum: [UserRole.ADMIN, UserRole.USER, UserRole.GUEST],
+    default: UserRole.USER,
+  },
   guest: { type: Boolean, default: false },
   isVerified: { type: Boolean, default: false },
   provider: { type: String, enum: ['local', 'google', 'github', null], default: 'local' },
@@ -26,4 +36,6 @@ const userSchema = new Schema<IUser>({
   updatedAt: { type: Date, default: Date.now },
 });
 
-export const User = mongoose.model<IUser>('User', userSchema);
+const User = mongoose.model<IUser>('User', userSchema);
+
+export default User;
