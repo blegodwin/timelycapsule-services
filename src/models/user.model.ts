@@ -9,6 +9,8 @@ export interface IUser extends Document {
 	isVerified: boolean;
 	provider: 'local' | 'google' | 'github' | null;
 	lastLoginAt: Date;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -26,6 +28,8 @@ const userSchema = new Schema<IUser>({
 		default: 'local',
 	},
 	lastLoginAt: { type: Date },
+  resetPasswordToken: { type: String },
+  resetPasswordExpires: { type: Date },
 	createdAt: { type: Date, default: Date.now },
 	updatedAt: { type: Date, default: Date.now },
 });
