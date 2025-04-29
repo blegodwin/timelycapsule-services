@@ -1,15 +1,25 @@
-import { Request, Response } from "express";
-import bcrypt from "bcryptjs";
-import { validationResult } from "express-validator";
-import { User } from "../models/user.model";
-import { generateToken } from "../utils/jwt";
-// import { sendPasswordResetEmail } from '../services/email.service';
+import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import { validationResult } from 'express-validator';
+import { User } from '../models/user.model';
+import RefreshToken from '../models/refresh_token.model';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken, generateToken } from '../utils/jwt';
 import {
   generateResetToken,
   generateResetTokenExpiry,
-} from "../utils/token.utils";
-import logger from "../config/logger";
-import { sendEmail } from "../services/email.service";
+} from '../utils/token.utils';
+import logger from '../config/logger';
+import { sendEmail } from '../services/email.service';
+
+const setRefreshTokenCookie = (res: Response, token: string) => {
+  res.cookie('refreshToken', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/auth/refresh',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+};
 
 // POST /auth/register
 export const register = async (req: Request, res: Response): Promise<void> => {
@@ -40,8 +50,19 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       isVerified: false,
     });
 
-    const token = generateToken(newUser.id);
-    res.status(201).json({ token });
+    const accessToken = generateAccessToken(newUser.id);
+    const refreshToken = generateRefreshToken(newUser.id);
+
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    await RefreshToken.create({
+      user: newUser.id,
+      token: hashedRefreshToken,
+      expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
+    setRefreshTokenCookie(res, refreshToken);
+
+    res.status(201).json({ accessToken });
   } catch (error) {
     console.error(error);
     res.status(500).send("Server error");
@@ -74,17 +95,100 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     user.lastLoginAt = new Date();
     await user.save();
 
-    const token = generateToken(user.id);
-    res.json({ token });
+    const accessToken = generateAccessToken(user.id);
+    const refreshToken = generateRefreshToken(user.id);
+
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    await RefreshToken.create({
+      user: user.id,
+      token: hashedRefreshToken,
+      expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
+    setRefreshTokenCookie(res, refreshToken);
+
+    res.json({ accessToken });
   } catch (error) {
     console.error(error);
     res.status(500).send("Server error");
   }
 };
 
+// POST /auth/refresh
+export const refresh = async (req: Request, res: Response): Promise<void> => {
+  let token = req.cookies.refreshToken;
+
+  if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  if (!token) {
+    res.status(401).json({ message: 'No refresh token provided' });
+    return;
+  }
+
+  try {
+    const payload = verifyRefreshToken(token) as { id: string };
+    const userId = payload.id;
+
+    const storedTokens = await RefreshToken.find({ user: userId });
+
+    let validStoredToken = null;
+    for (const stored of storedTokens) {
+      const match = await bcrypt.compare(token, stored.token);
+      if (match) {
+        validStoredToken = stored;
+        break;
+      }
+    }
+
+    if (!validStoredToken) {
+      res.status(403).json({ message: 'Invalid refresh token' });
+      return;
+    }
+
+    await RefreshToken.deleteOne({ _id: validStoredToken._id });
+
+    const newAccessToken = generateAccessToken(userId);
+    const newRefreshToken = generateRefreshToken(userId);
+
+    const hashedNewRefreshToken = await bcrypt.hash(newRefreshToken, 10);
+    await RefreshToken.create({
+      user: userId,
+      token: hashedNewRefreshToken,
+      expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
+    setRefreshTokenCookie(res, newRefreshToken);
+
+    res.json({ accessToken: newAccessToken });
+  } catch (error) {
+    console.error(error);
+    res.status(403).json({ message: 'Invalid or expired refresh token' });
+  }
+};
+
 // POST /auth/logout
-export const logout = async (_req: Request, res: Response): Promise<void> => {
-  res.status(200).json({ message: "Logged out" });
+export const logout = async (req: Request, res: Response): Promise<void> => {
+  const token = req.cookies.refreshToken;
+
+  if (token) {
+    try {
+      const payload = verifyRefreshToken(token) as { id: string };
+      await RefreshToken.deleteMany({ user: payload.id });
+    } catch (error) {
+      console.error('Error verifying refresh token during logout');
+    }
+  }
+
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/auth/refresh',
+  });
+
+  res.status(200).json({ message: 'Logged out' });
 };
 
 // POST /auth/guest
@@ -99,8 +203,9 @@ export const guest = async (_req: Request, res: Response): Promise<void> => {
       isVerified: false,
     });
 
-    const token = generateToken(guestUser.id);
-    res.status(201).json({ token });
+    const accessToken = generateAccessToken(guestUser.id);
+
+    res.status(201).json({ accessToken });
   } catch (error) {
     console.error(error);
     res.status(500).send("Server error");
@@ -119,7 +224,6 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
 
   try {
     const user = await User.findOne({ email });
-    console.log("User:", user);
     if (!user || user.guest) {
       res.status(200).json({
         message: "If an account exists, a password reset email has been sent",
@@ -147,7 +251,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
     await sendEmail({
       email: user.email,
       subject: "Password Reset Request",
-      html :mailOptions,
+      html: mailOptions,
     });
 
     res.status(200).json({
@@ -159,12 +263,8 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
   }
 };
 
-
 // POST /auth/reset-password
-export const resetPassword = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     res.status(400).json({ errors: errors.array() });
@@ -200,10 +300,7 @@ export const resetPassword = async (
 };
 
 // POST /auth/upgrade
-export const upgradeGuest = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+export const upgradeGuest = async (req: Request, res: Response): Promise<void> => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     res.status(400).json({ errors: errors.array() });
@@ -211,10 +308,9 @@ export const upgradeGuest = async (
   }
 
   const { email, password } = req.body;
-  const userId = req.user?.id; 
+  const userId = req.user?.id;
 
   try {
-    // Check if email is already in use
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       res.status(400).json({ message: "Email already in use" });
@@ -237,9 +333,7 @@ export const upgradeGuest = async (
     await user.save();
 
     const token = generateToken(user.id);
-    res
-      .status(200)
-      .json({ token, message: "Guest account upgraded successfully" });
+    res.status(200).json({ token, message: "Guest account upgraded successfully" });
   } catch (error) {
     logger.error("Error in upgradeGuest:", error);
     res.status(500).json({ message: "Server error" });
