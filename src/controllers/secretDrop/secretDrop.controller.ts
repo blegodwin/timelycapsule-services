@@ -4,11 +4,13 @@ import {
   SecretDropSchema,
 } from '../models/secretDropCapsule';
 import crypto from 'crypto';
+import  {validateUnlock}  from '../../utils/unlockEngine';
+import SecretDropUnlockModel from '../../models/SecretDropUnlock';
 
 const HASH_LENGTH = 12;
 const PEPPER = process.env.SECRET_HASH_PEPPER!;
 
-export function generateUniqueHash(capsule): string {
+export function generateUniqueHash(capsule:any): string {
   const input = `${capsule._id}${capsule.createdAt.toISOString()}${PEPPER}`;
 
   return crypto
@@ -43,6 +45,82 @@ export const createSecretDropCapsule = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const unlockCapsule = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { longitude, latitude } = req.body;
+
+    if (
+      longitude === undefined || latitude === undefined ||
+      isNaN(Number(longitude)) || isNaN(Number(latitude))
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid longitude and latitude are required'
+      });
+    }
+
+    const capsule = await SecretDropCapsuleModel.findById(id);
+
+    if (!capsule || !capsule.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Capsule not found or inactive'
+      });
+    }
+
+    const alreadyUnlocked = await SecretDropUnlockModel.findOne({
+      userId: req.user!.id,
+      capsuleId: capsule._id
+    });
+
+    if (alreadyUnlocked) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have already unlocked this capsule',
+        data: {
+          unlockTime: alreadyUnlocked.unlockTime,
+          hasReply: !!alreadyUnlocked.reply
+        }
+      });
+    }
+
+    const userLocation = [parseFloat(longitude), parseFloat(latitude)];
+
+    const unlockResult = validateUnlock(capsule, userLocation);
+
+    if (!unlockResult.canUnlock) {
+      return res.status(403).json({
+        success: false,
+        message: 'Cannot unlock capsule',
+        reason: unlockResult.reason,
+        details: unlockResult.details
+      });
+    }
+
+    // Success path — optionally save unlock
+    const unlockEntry = await SecretDropUnlockModel.create({
+      userId: req.user!.id,
+      capsuleId: capsule._id,
+      unlockTime: new Date(),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Capsule unlocked successfully',
+      data: unlockEntry
+    });
+
+  } catch (error) {
+    console.error('Unlock error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while unlocking capsule'
+    });
+  }
+};
+
 
 export const getCapsule = async (req: Request, res: Response) => {
   try {
