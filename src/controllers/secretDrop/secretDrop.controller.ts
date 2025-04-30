@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import {
   SecretDropCapsuleModel,
   SecretDropSchema,
-} from '../models/secretDropCapsule';
+} from '../../models/secretDropCapsule';
 import crypto from 'crypto';
 import  {validateUnlock}  from '../../utils/unlockEngine';
 import SecretDropUnlockModel from '../../models/SecretDropUnlock';
@@ -10,7 +10,9 @@ import SecretDropUnlockModel from '../../models/SecretDropUnlock';
 const HASH_LENGTH = 12;
 const PEPPER = process.env.SECRET_HASH_PEPPER!;
 
-export function generateUniqueHash(capsule:any): string {
+
+export function generateUniqueHash(capsule: { _id: string; createdAt: { toISOString: () => string; }; }): string {
+
   const input = `${capsule._id}${capsule.createdAt.toISOString()}${PEPPER}`;
 
   return crypto
@@ -37,7 +39,7 @@ export const createSecretDropCapsule = async (req: Request, res: Response) => {
     res.status(201).json({
       id: capsule._id,
       message: 'Capsule created successfully',
-      hash: generateUniqueHash(capsule),
+      hash: generateUniqueHash({ _id: String(capsule._id), createdAt: capsule.createdAt }),
     });
   } catch (error) {
     res.status(400).json({
@@ -131,7 +133,7 @@ export const getCapsule = async (req: Request, res: Response) => {
 
     if (!capsule) return res.status(404).json({ error: 'Capsule not found' });
     res.json(capsule);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -164,7 +166,7 @@ export const deleteCapsule = async (req: Request, res: Response) => {
     if (!capsule) return res.status(404).json({ error: 'Capsule not found' });
 
     res.json({ success: true });
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Server error' });
   }
 };
