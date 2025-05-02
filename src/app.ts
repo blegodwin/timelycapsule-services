@@ -7,17 +7,19 @@ import capsuleRouter from './routes/index';
 import authRouter from './routes/auth.routes';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import activityLogRoutes from './routes/activityLog.routes';
+
 import cookieParser from 'cookie-parser';
 dotenv.config();
 
 const app = express();
 
 app.use(
-  cors({
-    origin: '*',
-    allowedHeaders: '*',
-    exposedHeaders: '*',
-  })
+	cors({
+		origin: '*',
+		allowedHeaders: '*',
+		exposedHeaders: '*',
+	})
 );
 
 app.use(loggingHandler);
@@ -26,13 +28,18 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 app.use('/api/v1/capsule', capsuleRouter());
-app.use('/api/v1/auth', authRouter()); 
+app.use('/api/v1/auth', authRouter());
+app.use('/api/v1/activity/log', activityLogRoutes);
 
 app.use(routeError);
 
 app.listen(process.env.PORT, () => {
-  logger.info(`<---------------------------------------------------------------->`);
-  logger.info(`Server is running on port ${process.env.PORT}`);
-  connectDB();
-  logger.info(`<---------------------------------------------------------------->`);
+	logger.info(
+		`<---------------------------------------------------------------->`
+	);
+	logger.info(`Server is running on port ${process.env.PORT}`);
+	connectDB();
+	logger.info(
+		`<---------------------------------------------------------------->`
+	);
 });

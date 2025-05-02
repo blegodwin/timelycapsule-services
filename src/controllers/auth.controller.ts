@@ -8,7 +8,7 @@ import User from '../models/user.model';
 
 import { User } from '../models/user.model';
 import RefreshToken from '../models/refresh_token.model';
-import { generateAccessToken, generateRefreshToken, verifyRefreshToken, generateToken } from '../utils/jwt';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import {
   generateResetToken,
   generateResetTokenExpiry,
@@ -77,6 +77,32 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       token,
     });
 
+	const errors = validationResult(req);
+	if (!errors.isEmpty()) {
+		res.status(400).json({ errors: errors.array() });
+		return;
+	}
+/* 
+	const { email, password, displayName } = req.body; */
+
+	try {
+		const existingUser = await User.findOne({ email });
+		if (existingUser) {
+			res.status(400).json({ message: 'Email already exists' });
+			return;
+		}
+
+		const salt = await bcrypt.genSalt(10);
+		const passwordHash = await bcrypt.hash(password, salt);
+
+		const newUser = await User.create({
+			email,
+			passwordHash,
+			displayName,
+			roles: ['user'],
+			guest: false,
+			isVerified: false,
+		});
 
     const accessToken = generateAccessToken(newUser.id);
     const refreshToken = generateRefreshToken(newUser.id);
@@ -100,29 +126,29 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
 // POST /auth/login
 export const login = async (req: Request, res: Response): Promise<void> => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    res.status(400).json({ errors: errors.array() });
-    return;
-  }
+	const errors = validationResult(req);
+	if (!errors.isEmpty()) {
+		res.status(400).json({ errors: errors.array() });
+		return;
+	}
 
-  const { email, password } = req.body;
+	const { email, password } = req.body;
 
-  try {
-    const user = await User.findOne({ email });
-    if (!user || user.guest) {
-      res.status(400).json({ message: "Invalid credentials" });
-      return;
-    }
+	try {
+		const user = await User.findOne({ email });
+		if (!user || user.guest) {
+			res.status(400).json({ message: 'Invalid credentials' });
+			return;
+		}
 
-    const isMatch = await bcrypt.compare(password, user.passwordHash!);
-    if (!isMatch) {
-      res.status(400).json({ message: "Invalid credentials" });
-      return;
-    }
+		const isMatch = await bcrypt.compare(password, user.passwordHash!);
+		if (!isMatch) {
+			res.status(400).json({ message: 'Invalid credentials' });
+			return;
+		}
 
-    user.lastLoginAt = new Date();
-    await user.save();
+		user.lastLoginAt = new Date();
+		await user.save();
 
 
     const token = jwt.sign(
@@ -237,20 +263,20 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
     path: '/auth/refresh',
   });
 
-  res.status(200).json({ message: 'Logged out' });
+	res.status(200).json({ message: 'Logged out' });
 };
 
 // POST /auth/guest
 export const guest = async (_req: Request, res: Response): Promise<void> => {
-  try {
-    const guestUser = await User.create({
-      email: null,
-      passwordHash: null,
-      displayName: `Guest_${Date.now()}`,
-      roles: ["guest"],
-      guest: true,
-      isVerified: false,
-    });
+	try {
+		const guestUser = await User.create({
+			email: null,
+			passwordHash: null,
+			displayName: `Guest_${Date.now()}`,
+			roles: ['guest'],
+			guest: true,
+			isVerified: false,
+		});
 
     const accessToken = generateAccessToken(guestUser.id);
 
@@ -381,7 +407,7 @@ export const upgradeGuest = async (req: Request, res: Response): Promise<void> =
     user.roles = ["user"];
     await user.save();
 
-    const token = generateToken(user.id);
+    const token = generateAccessToken(user.id);
     res.status(200).json({ token, message: "Guest account upgraded successfully" });
   } catch (error) {
     logger.error("Error in upgradeGuest:", error);
