@@ -1,6 +1,11 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { validationResult } from 'express-validator';
+
+import jwt from 'jsonwebtoken';
+import { generateToken } from '../utils/jwt';
+import User from '../models/user.model';
+
 import { User } from '../models/user.model';
 import RefreshToken from '../models/refresh_token.model';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
@@ -21,15 +26,64 @@ const setRefreshTokenCookie = (res: Response, token: string) => {
   });
 };
 
+
 // POST /auth/register
 export const register = async (req: Request, res: Response): Promise<void> => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    res.status(400).json({ errors: errors.array() });
+    return;
+  }
+
+  const { email, password, displayName, roles } = req.body;
+
+  try {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      res.status(400).json({ message: "Email already exists" });
+      return;
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    const user = await User.create({
+      email,
+      passwordHash,
+      displayName,
+
+      roles: roles || "user",
+
+      guest: false,
+      isVerified: false,
+    });
+    await user.save();
+
+    const token = jwt.sign(
+      { _id: user._id, displayName: user.displayName, email: user.email, role: user.roles, guest: user.guest, isVerified: user.isVerified },
+      process.env.JWT_SECRET as string,
+      { expiresIn: '1d' }
+    );
+    res.status(201).json({
+      message: 'User registered successfully',
+      user: {
+        _id: user._id,
+        displayName: user.displayName,
+        email: user.email,
+        role: user.roles,
+        guest: user.guest,
+        isVerified: user.isVerified,
+      },
+      token,
+    });
+
 	const errors = validationResult(req);
 	if (!errors.isEmpty()) {
 		res.status(400).json({ errors: errors.array() });
 		return;
 	}
-
-	const { email, password, displayName } = req.body;
+/* 
+	const { email, password, displayName } = req.body; */
 
 	try {
 		const existingUser = await User.findOne({ email });
@@ -63,6 +117,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     setRefreshTokenCookie(res, refreshToken);
 
     res.status(201).json({ accessToken });
+
   } catch (error) {
     console.error(error);
     res.status(500).send("Server error");
@@ -94,6 +149,25 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
 		user.lastLoginAt = new Date();
 		await user.save();
+
+
+    const token = jwt.sign(
+      { _id: user._id, displayName: user.displayName, email: user.email, role: user.roles, guest: user.guest, isVerified: user.isVerified },
+      process.env.JWT_SECRET as string,
+      { expiresIn: '1d' }
+    );
+    res.status(201).json({
+      message: 'User Login successfully',
+      user: {
+        _id: user._id,
+        displayName: user.displayName,
+        email: user.email,
+        role: user.roles,
+        guest: user.guest,
+        isVerified: user.isVerified,
+      },
+      token,
+    });
 
     const accessToken = generateAccessToken(user.id);
     const refreshToken = generateRefreshToken(user.id);
@@ -162,6 +236,7 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
     setRefreshTokenCookie(res, newRefreshToken);
 
     res.json({ accessToken: newAccessToken });
+
   } catch (error) {
     console.error(error);
     res.status(403).json({ message: 'Invalid or expired refresh token' });
