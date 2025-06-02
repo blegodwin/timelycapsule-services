@@ -13,15 +13,12 @@ export interface INotification extends Document {
   title: string;
   message: string;
 
-  // Related entities
   relatedCapsule?: mongoose.Types.ObjectId;
   relatedCollaboration?: mongoose.Types.ObjectId;
 
-  // Status
   isRead: boolean;
   isEmailSent: boolean;
 
-  // Metadata
   metadata?: Record<string, any>;
 
   createdAt: Date;
@@ -86,7 +83,6 @@ const notificationSchema = new Schema<INotification>(
   }
 );
 
-// Indexes
 notificationSchema.index({ recipient: 1, isRead: 1 });
 notificationSchema.index({ recipient: 1, createdAt: -1 });
 notificationSchema.index({ type: 1 });

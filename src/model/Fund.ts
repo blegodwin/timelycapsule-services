@@ -5,27 +5,22 @@ export interface IFund extends Document {
   capsule: mongoose.Types.ObjectId;
   attachedBy: mongoose.Types.ObjectId;
 
-  // Crypto details
   cryptocurrency: string; // BTC, ETH, etc.
   amount: number;
   walletAddress: string;
   privateKey?: string; // encrypted
 
-  // Transaction tracking
   depositTransactionHash?: string;
   withdrawTransactionHash?: string;
 
-  // Status
   status: 'pending' | 'confirmed' | 'withdrawn' | 'failed';
   confirmations: number;
 
-  // Withdrawal details
   withdrawnBy?: mongoose.Types.ObjectId;
   withdrawnAt?: Date;
   withdrawalAddress?: string;
 
-  // Metadata
-  exchangeRate?: number; // USD rate at time of attachment
+  exchangeRate?: number; 
   feesPaid: number;
 
   createdAt: Date;
@@ -38,7 +33,7 @@ const fundSchema = new Schema<IFund>(
       type: Schema.Types.ObjectId,
       ref: 'Capsule',
       required: true,
-      unique: true, // One fund per capsule
+      unique: true,
     },
     attachedBy: {
       type: Schema.Types.ObjectId,
@@ -61,7 +56,7 @@ const fundSchema = new Schema<IFund>(
     },
     privateKey: {
       type: String,
-      select: false, // Never return in queries
+      select: false, 
     },
     depositTransactionHash: String,
     withdrawTransactionHash: String,
@@ -91,7 +86,6 @@ const fundSchema = new Schema<IFund>(
   }
 );
 
-// Indexes
 fundSchema.index({ capsule: 1 });
 fundSchema.index({ attachedBy: 1 });
 fundSchema.index({ status: 1 });

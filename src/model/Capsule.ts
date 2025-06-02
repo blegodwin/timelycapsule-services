@@ -9,31 +9,26 @@ export interface ICapsule extends Document {
   visibility: 'private' | 'public' | 'unlisted';
   status: 'draft' | 'sealed' | 'unlocked' | 'expired';
 
-  // Time-based unlock
   unlockDate?: Date;
   unlockPassword?: string;
   passwordHint?: string;
 
-  // Location-based unlock
   unlockLocation?: {
     type: 'Point';
-    coordinates: [number, number]; // [longitude, latitude]
-    radius: number; // meters
+    coordinates: [number, number]; 
+    radius: number; 
     address?: string;
   };
 
-  // Content
   content: {
     text?: string;
     mediaFiles: mongoose.Types.ObjectId[];
     attachedFunds?: mongoose.Types.ObjectId;
   };
 
-  // Metadata
   tags: string[];
   category: string;
 
-  // Interaction stats
   stats: {
     views: number;
     reactions: number;
@@ -41,11 +36,9 @@ export interface ICapsule extends Document {
     comments: number;
   };
 
-  // Collaboration
   collaborators: mongoose.Types.ObjectId[];
   maxCollaborators?: number;
 
-  // Timestamps
   sealedAt?: Date;
   unlockedAt?: Date;
   expiresAt?: Date;
@@ -174,7 +167,6 @@ const capsuleSchema = new Schema<ICapsule>(
   }
 );
 
-// Indexes
 capsuleSchema.index({ creator: 1, status: 1 });
 capsuleSchema.index({ unlockDate: 1, status: 1 });
 capsuleSchema.index({ visibility: 1, status: 1 });
@@ -183,13 +175,11 @@ capsuleSchema.index({ category: 1 });
 capsuleSchema.index({ unlockLocation: '2dsphere' });
 capsuleSchema.index({ createdAt: -1 });
 
-// Virtual for time remaining
 capsuleSchema.virtual('timeRemaining').get(function () {
   if (!this.unlockDate || this.status === 'unlocked') return 0;
   return Math.max(0, this.unlockDate.getTime() - Date.now());
 });
 
-// Virtual for is unlockable
 capsuleSchema.virtual('isUnlockable').get(function () {
   return (
     this.status === 'sealed' &&

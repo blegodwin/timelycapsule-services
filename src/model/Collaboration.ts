@@ -96,7 +96,6 @@ const collaborationSchema = new Schema<ICollaboration>(
   }
 );
 
-// Indexes
 collaborationSchema.index({ capsule: 1, user: 1 }, { unique: true });
 collaborationSchema.index({ user: 1, status: 1 });
 collaborationSchema.index({ invitedBy: 1 });

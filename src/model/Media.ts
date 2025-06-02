@@ -11,19 +11,16 @@ export interface IMedia extends Document {
   filePath: string;
   thumbnail?: string;
 
-  // Media metadata
   metadata: {
     width?: number;
     height?: number;
-    duration?: number; // for video/audio
+    duration?: number; 
     format?: string;
   };
 
-  // Processing status
   processingStatus: 'pending' | 'processing' | 'completed' | 'failed';
   processingError?: string;
 
-  // Access control
   isPublic: boolean;
   downloadCount: number;
 
@@ -90,7 +87,6 @@ const mediaSchema = new Schema<IMedia>(
   }
 );
 
-// Indexes
 mediaSchema.index({ capsule: 1 });
 mediaSchema.index({ uploadedBy: 1 });
 mediaSchema.index({ mimeType: 1 });

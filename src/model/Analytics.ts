@@ -5,11 +5,9 @@ export interface IAnalytics extends Document {
   entityType: 'capsule' | 'user';
   entityId: mongoose.Types.ObjectId;
 
-  // Time period
   period: 'daily' | 'weekly' | 'monthly';
   date: Date;
 
-  // Metrics
   metrics: {
     views: number;
     uniqueViews: number;
@@ -20,7 +18,6 @@ export interface IAnalytics extends Document {
     textContributions: number;
   };
 
-  // Demographic data
   demographics?: {
     countries: Map<string, number>;
     ageGroups: Map<string, number>;
@@ -86,7 +83,6 @@ const analyticsSchema = new Schema<IAnalytics>(
   }
 );
 
-// Compound unique index
 analyticsSchema.index(
   {
     entityType: 1,

@@ -32,7 +32,6 @@ const reactionSchema = new Schema<IReaction>(
   }
 );
 
-// Unique constraint - one reaction per user per capsule
 reactionSchema.index({ capsule: 1, user: 1 }, { unique: true });
 reactionSchema.index({ capsule: 1, type: 1 });
 
