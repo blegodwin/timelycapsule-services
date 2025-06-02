@@ -1,5 +1,3 @@
-// Main exports file
-// export { User, IUser } from './User';
 export { User, IUser } from "./User";
 export { Capsule, ICapsule } from "./Capsule";
 export { Collaboration, ICollaboration } from "./Collaboration";
