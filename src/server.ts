@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { errorHandler } from './middleware/error.middleware';
 import routes from './routes';
+import connectDB from './config/database';
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.use(errorHandler);
 // Start server
 const startServer = async (): Promise<void> => {
   try {
+    await connectDB();
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });
