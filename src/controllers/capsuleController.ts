@@ -26,6 +26,19 @@ interface CreateCapsuleRequest {
   maxCollaborators?: number;
 }
 
+interface CapsuleQuery {
+  page?: string;
+  limit?: string;
+  status?: 'draft' | 'sealed' | 'unlocked' | 'expired';
+  type?: 'personal' | 'group' | 'public';
+  visibility?: 'private' | 'public' | 'unlisted';
+  category?: string;
+  tags?: string;
+  creator?: string;
+  sortBy?: 'createdAt' | 'updatedAt' | 'unlockDate' | 'title';
+  sortOrder?: 'asc' | 'desc';
+}
+
 export const createCapsule = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id; // Assuming user is attached to req via auth middleware
@@ -237,4 +250,311 @@ export const createCapsule = async (req: Request, res: Response) => {
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
+
+  // ////////////////////
+  
 };
+
+export const getCapsules = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
+
+    const {
+      page = '1',
+      limit = '10',
+      status,
+      type,
+      visibility,
+      category,
+      tags,
+      creator,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    }: CapsuleQuery = req.query;
+
+    // Parse pagination
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit))); // Max 50 items per page
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build filter query
+    const filter: any = {};
+
+    // Permission-based filtering
+    // Users can see:
+    // 1. Their own capsules (any visibility)
+    // 2. Public capsules from others
+    // 3. Capsules they're collaborators on
+    filter.$or = [
+      { creator: new mongoose.Types.ObjectId(userId) }, // Own capsules
+      { visibility: 'public' }, // Public capsules
+      { collaborators: new mongoose.Types.ObjectId(userId) }, // Collaborated capsules
+    ];
+
+    // Apply additional filters
+    if (status) {
+      filter.status = status;
+    }
+
+    if (type) {
+      filter.type = type;
+    }
+
+    if (visibility) {
+      filter.visibility = visibility;
+    }
+
+    if (category) {
+      filter.category = { $regex: category, $options: 'i' };
+    }
+
+    if (tags) {
+      const tagArray = tags.split(',').map((tag) => tag.trim().toLowerCase());
+      filter.tags = { $in: tagArray };
+    }
+
+    if (creator) {
+      filter.creator = new mongoose.Types.ObjectId(creator);
+    }
+
+    // Build sort object
+    const sortObj: any = {};
+    sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Execute query with pagination
+    const [capsules, totalCount] = await Promise.all([
+      Capsule.find(filter)
+        .populate('creator', 'username firstName lastName avatar')
+        .populate('collaborators', 'username firstName lastName avatar')
+        .select('-unlockPassword') // Never expose passwords
+        .sort(sortObj)
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Capsule.countDocuments(filter),
+    ]);
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / limitNum);
+    const hasNextPage = pageNum < totalPages;
+    const hasPrevPage = pageNum > 1;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        capsules,
+        pagination: {
+          currentPage: pageNum,
+          totalPages,
+          totalCount,
+          limit: limitNum,
+          hasNextPage,
+          hasPrevPage,
+          nextPage: hasNextPage ? pageNum + 1 : null,
+          prevPage: hasPrevPage ? pageNum - 1 : null,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Get capsules error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+export const getCapsuleById = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
+
+    // Validate capsule ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid capsule ID',
+      });
+    }
+
+    // Find capsule
+    const capsule = await Capsule.findById(id)
+      .populate('creator', 'username firstName lastName avatar')
+      .populate('collaborators', 'username firstName lastName avatar')
+      .select('-unlockPassword'); // Never expose passwords
+
+    if (!capsule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Capsule not found',
+      });
+    }
+
+    // Check permissions
+    const isCreator = capsule.creator._id.toString() === userId;
+    const isCollaborator = capsule.collaborators.some(
+      (collab: any) => collab._id.toString() === userId
+    );
+    const isPublic = capsule.visibility === 'public';
+
+    if (!isCreator && !isCollaborator && !isPublic) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied',
+      });
+    }
+
+    // Prepare response data based on permissions and capsule status
+    let responseData: any = {
+      _id: capsule._id,
+      title: capsule.title,
+      description: capsule.description,
+      creator: capsule.creator,
+      type: capsule.type,
+      visibility: capsule.visibility,
+      status: capsule.status,
+      category: capsule.category,
+      tags: capsule.tags,
+      stats: capsule.stats,
+      createdAt: capsule.createdAt,
+      updatedAt: capsule.updatedAt,
+    };
+
+    // Add sensitive data only for creators and collaborators
+    if (isCreator || isCollaborator) {
+      responseData.collaborators = capsule.collaborators;
+      responseData.maxCollaborators = capsule.maxCollaborators;
+      responseData.unlockDate = capsule.unlockDate;
+      responseData.passwordHint = capsule.passwordHint;
+      responseData.unlockLocation = capsule.unlockLocation;
+      responseData.sealedAt = capsule.sealedAt;
+      responseData.unlockedAt = capsule.unlockedAt;
+      responseData.expiresAt = capsule.expiresAt;
+    }
+
+    // Content visibility based on status and permissions
+    if (capsule.status === 'unlocked' || isCreator || isCollaborator) {
+      responseData.content = capsule.content;
+    } else {
+      // For sealed capsules, don't show content to non-owners
+      responseData.content = {
+        text: null,
+        mediaFiles: [],
+        attachedFunds: capsule.content.attachedFunds,
+      };
+    }
+
+    // Add virtual fields
+    responseData.timeRemaining = capsule.timeRemaining;
+    responseData.isUnlockable = capsule.isUnlockable;
+
+    // Increment view count (only for non-creators viewing)
+    if (!isCreator) {
+      await Capsule.findByIdAndUpdate(id, {
+        $inc: { 'stats.views': 1 },
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        capsule: responseData,
+      },
+    });
+  } catch (error) {
+    console.error('Get capsule by ID error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+export const getMyCapsules = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
+
+    const {
+      page = '1',
+      limit = '10',
+      status,
+      type,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    }: Partial<CapsuleQuery> = req.query;
+
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build filter for user's capsules
+    const filter: any = {
+      creator: new mongoose.Types.ObjectId(userId),
+    };
+
+    if (status) filter.status = status;
+    if (type) filter.type = type;
+
+    const sortObj: any = {};
+    sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    const [capsules, totalCount] = await Promise.all([
+      Capsule.find(filter)
+        .populate('collaborators', 'username firstName lastName avatar')
+        .select('-unlockPassword')
+        .sort(sortObj)
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Capsule.countDocuments(filter),
+    ]);
+
+    const totalPages = Math.ceil(totalCount / limitNum);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        capsules,
+        pagination: {
+          currentPage: pageNum,
+          totalPages,
+          totalCount,
+          limit: limitNum,
+          hasNextPage: pageNum < totalPages,
+          hasPrevPage: pageNum > 1,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Get my capsules error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
