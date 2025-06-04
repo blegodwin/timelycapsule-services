@@ -1,48 +1,147 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Request, Response, NextFunction } from 'express';
-import jwt, { JwtPayload } from 'jsonwebtoken';
-import User from '../model/user.model';
+import { JWTUtils, JWTPayload } from '../utils/jwt';
+import { User, IUser } from '../models/User';
 
-interface AuthRequest extends Request {
-  user?: any;
+export interface AuthenticatedRequest extends Request {
+  user?: IUser;
+  userId?: string;
 }
 
-export default async (req: AuthRequest, res: Response, next: NextFunction): Promise<void>  => {
-  try {
-    const authorizationHeader = req?.headers?.authorization || '';
+export class AuthMiddleware {
+  static async requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const token = AuthMiddleware.extractToken(req);
+      
+      if (!token) {
+        res.status(401).json({ 
+          error: 'Access denied', 
+          message: 'No token provided' 
+        });
+        return;
+      }
 
-    if (!authorizationHeader?.startsWith('Bearer')) {
-      res
-        .status(401)
-        .json({ success: false, message: 'You are not logged in' });
+      const decoded = JWTUtils.verifyAccessToken(token);
+      const user = await User.findById(decoded.userId).select('-password');
+
+      if (!user) {
+        res.status(401).json({ 
+          error: 'Access denied', 
+          message: 'Invalid token - user not found' 
+        });
+        return;
+      }
+
+      req.user = user;
+      req.userId = user._id.toString();
+      next();
+    } catch (error) {
+      if (error instanceof Error && error.name === 'TokenExpiredError') {
+        res.status(401).json({ 
+          error: 'Token expired', 
+          message: 'Please refresh your token' 
+        });
+        return;
+      }
+      
+      res.status(401).json({ 
+        error: 'Access denied', 
+        message: 'Invalid token' 
+      });
     }
-
-    const token = authorizationHeader.split(' ')[1];
-    if (!token) {
-      res
-        .status(401)
-        .json({ success: false, message: 'You are not logged in' });
-    }
-
-    const decodedJwt = jwt.verify(
-      token,
-      process.env.JWT_SECRET as string
-    ) as JwtPayload;
-    const user = await User.findOne({ email: decodedJwt.email });
-
-    if (!user) {
-      res
-        .status(401)
-        .json({ success: false, message: 'You are not logged in' });
-    }
-
-    req.user = user;
-    next();
-  } catch (err: any) {
-     res
-      .status(401)
-      .json({ success: false, message: 'You are not logged in' });
-    return;
   }
-};
+
+  
+  static async optionalAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const token = AuthMiddleware.extractToken(req);
+      
+      if (!token) {
+        next();
+        return;
+      }
+
+      const decoded = JWTUtils.verifyAccessToken(token);
+      const user = await User.findById(decoded.userId).select('-password');
+
+      if (user) {
+        req.user = user;
+        req.userId = user._id.toString();
+      }
+
+      next();
+    } catch (error) {
+      // For optional auth, we don't return an error, just continue without user
+      next();
+    }
+  }
+
+  
+  static async requireAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      
+      await AuthMiddleware.requireAuth(req, res, () => {});
+      
+      if (!req.user) {
+        res.status(401).json({ 
+          error: 'Access denied', 
+          message: 'Authentication required' 
+        });
+        return;
+      }
+
+
+      if (!req.user.isVerified) {
+        res.status(403).json({ 
+          error: 'Access denied', 
+          message: 'Admin privileges required' 
+        });
+        return;
+      }
+
+      next();
+    } catch (error) {
+      res.status(500).json({ 
+        error: 'Server error', 
+        message: 'Error checking admin status' 
+      });
+    }
+  }
+
+  
+  static async requireVerified(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      await AuthMiddleware.requireAuth(req, res, () => {});
+      
+      if (!req.user?.isVerified) {
+        res.status(403).json({ 
+          error: 'Account verification required', 
+          message: 'Please verify your account to access this resource' 
+        });
+        return;
+      }
+
+      next();
+    } catch (error) {
+      res.status(500).json({ 
+        error: 'Server error', 
+        message: 'Error checking verification status' 
+      });
+    }
+  }
+
+  private static extractToken(req: Request): string | null {
+    const authHeader = req.headers.authorization;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      return authHeader.substring(7);
+    }
+    
+    
+    const tokenFromCookie = req.cookies?.accessToken;
+    if (tokenFromCookie) {
+      return tokenFromCookie;
+    }
+    
+    return null;
+  }
+}

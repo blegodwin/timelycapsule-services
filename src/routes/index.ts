@@ -1,12 +1,11 @@
-import express from 'express';
-import authRouter from './auth.router';
-import userRouter from './user.router';
-import streakRouter from './streak.router';
+import express, { Router } from 'express';
+import healthRoutes from './features/health';
+import authRoutes from './features/auth.routes';
 
-const router = express.Router();
-export default (): express.Router => {
-  authRouter(router);
-  userRouter(router);
-  streakRouter(router)
-  return router;
-};
+const router: Router = express.Router();
+
+// Mount feature routes
+router.use('/health', healthRoutes);
+router.use('/auth', authRoutes);
+
+export default router; 
