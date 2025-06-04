@@ -23,7 +23,7 @@ export class UserSessionService {
   ): string {
     const sessionId = this.generateSessionId();
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+    expiresAt.setDate(expiresAt.getDate() + 7); 
 
     const session: UserSession = {
       userId: user._id.toString(),
@@ -44,12 +44,12 @@ export class UserSessionService {
     const session = this.sessions.get(sessionId);
     
     if (session && session.expiresAt > new Date()) {
-      // Update last activity
+
       session.lastActivity = new Date();
       return session;
     }
     
-    // Remove expired session
+
     if (session) {
       this.sessions.delete(sessionId);
     }
