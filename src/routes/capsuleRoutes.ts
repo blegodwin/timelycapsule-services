@@ -12,5 +12,29 @@ router.post(
     CapsuleController.createCapsule(req, res);
   }
 );
+router.get(
+  '/capsules',
+  AuthMiddleware.requireAuth,
+  (req: Request, res: Response) => {
+    CapsuleController.getCapsules(req, res);
+  }
+);
+
+router.get(
+  '/capsules/my',
+  AuthMiddleware.requireAuth,
+  (req: Request, res: Response) => {
+    CapsuleController.getMyCapsules(req, res);
+  }
+);
+
+router.get(
+  '/capsules/:id',
+  AuthMiddleware.requireAuth,
+  (req: Request, res: Response) => {
+    CapsuleController.getCapsuleById(req, res);
+  }
+);
+
 
 export default router;
