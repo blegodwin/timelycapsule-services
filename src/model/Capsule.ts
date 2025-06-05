@@ -15,8 +15,8 @@ export interface ICapsule extends Document {
 
   unlockLocation?: {
     type: 'Point';
-    coordinates: [number, number]; 
-    radius: number; 
+    coordinates: [number, number];
+    radius: number;
     address?: string;
   };
 
@@ -38,7 +38,7 @@ export interface ICapsule extends Document {
 
   collaborators: mongoose.Types.ObjectId[];
   maxCollaborators?: number;
-
+  deletedAt?: Date | null;
   sealedAt?: Date;
   unlockedAt?: Date;
   expiresAt?: Date;
@@ -156,6 +156,10 @@ const capsuleSchema = new Schema<ICapsule>(
       default: 10,
       max: 50,
     },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
     sealedAt: Date,
     unlockedAt: Date,
     expiresAt: Date,
@@ -174,6 +178,7 @@ capsuleSchema.index({ tags: 1 });
 capsuleSchema.index({ category: 1 });
 capsuleSchema.index({ unlockLocation: '2dsphere' });
 capsuleSchema.index({ createdAt: -1 });
+capsuleSchema.index({ deletedAt: 1 });
 
 capsuleSchema.virtual('timeRemaining').get(function () {
   if (!this.unlockDate || this.status === 'unlocked') return 0;

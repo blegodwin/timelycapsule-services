@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Capsule } from '../models/Capsule';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
+import { Media } from 'src/model';
 
 interface CreateCapsuleRequest {
   title: string;
@@ -41,7 +42,7 @@ interface CapsuleQuery {
 
 export const createCapsule = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id; // Assuming user is attached to req via auth middleware
+    const userId = req.user?.id;
 
     if (!userId) {
       return res.status(401).json({
@@ -66,7 +67,6 @@ export const createCapsule = async (req: Request, res: Response) => {
       maxCollaborators = 10,
     }: CreateCapsuleRequest = req.body;
 
-    // Validation
     if (!title?.trim()) {
       return res.status(400).json({
         success: false,
@@ -88,7 +88,6 @@ export const createCapsule = async (req: Request, res: Response) => {
       });
     }
 
-    // Validate content exists
     if (
       !content?.text?.trim() &&
       (!content?.mediaFiles || content.mediaFiles.length === 0)
@@ -99,7 +98,6 @@ export const createCapsule = async (req: Request, res: Response) => {
       });
     }
 
-    // Validate collaborators if provided
     if (collaborators.length > 0) {
       const validCollaborators = await User.find({
         _id: {
@@ -115,7 +113,6 @@ export const createCapsule = async (req: Request, res: Response) => {
       }
     }
 
-    // Validate unlock date if provided
     let parsedUnlockDate: Date | undefined;
     if (unlockDate) {
       parsedUnlockDate = new Date(unlockDate);
@@ -134,7 +131,6 @@ export const createCapsule = async (req: Request, res: Response) => {
       }
     }
 
-    // Validate location if provided
     if (unlockLocation) {
       const { coordinates, radius = 100 } = unlockLocation;
       if (
@@ -162,7 +158,6 @@ export const createCapsule = async (req: Request, res: Response) => {
       }
     }
 
-    // Create capsule object
     const capsuleData: any = {
       title: title.trim(),
       description: description?.trim(),
@@ -182,7 +177,6 @@ export const createCapsule = async (req: Request, res: Response) => {
       status: 'draft',
     };
 
-    // Add optional fields
     if (parsedUnlockDate) {
       capsuleData.unlockDate = parsedUnlockDate;
     }
@@ -201,16 +195,13 @@ export const createCapsule = async (req: Request, res: Response) => {
       };
     }
 
-    // Create the capsule
     const capsule = new Capsule(capsuleData);
     await capsule.save();
 
-    // Update user stats
     await User.findByIdAndUpdate(userId, {
       $inc: { 'stats.capsulesCreated': 1 },
     });
 
-    // Populate creator info for response
     await capsule.populate('creator', 'username firstName lastName avatar');
 
     res.status(201).json({
@@ -250,9 +241,6 @@ export const createCapsule = async (req: Request, res: Response) => {
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
-
-  // ////////////////////
-  
 };
 
 export const getCapsules = async (req: Request, res: Response) => {
@@ -279,26 +267,20 @@ export const getCapsules = async (req: Request, res: Response) => {
       sortOrder = 'desc',
     }: CapsuleQuery = req.query;
 
-    // Parse pagination
     const pageNum = Math.max(1, parseInt(page));
-    const limitNum = Math.min(50, Math.max(1, parseInt(limit))); // Max 50 items per page
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    // Build filter query
-    const filter: any = {};
+    const filter: any = {
+      deletedAt: null,
+    };
 
-    // Permission-based filtering
-    // Users can see:
-    // 1. Their own capsules (any visibility)
-    // 2. Public capsules from others
-    // 3. Capsules they're collaborators on
     filter.$or = [
-      { creator: new mongoose.Types.ObjectId(userId) }, // Own capsules
-      { visibility: 'public' }, // Public capsules
-      { collaborators: new mongoose.Types.ObjectId(userId) }, // Collaborated capsules
+      { creator: new mongoose.Types.ObjectId(userId) },
+      { visibility: 'public' },
+      { collaborators: new mongoose.Types.ObjectId(userId) },
     ];
 
-    // Apply additional filters
     if (status) {
       filter.status = status;
     }
@@ -324,11 +306,9 @@ export const getCapsules = async (req: Request, res: Response) => {
       filter.creator = new mongoose.Types.ObjectId(creator);
     }
 
-    // Build sort object
     const sortObj: any = {};
     sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
-    // Execute query with pagination
     const [capsules, totalCount] = await Promise.all([
       Capsule.find(filter)
         .populate('creator', 'username firstName lastName avatar')
@@ -392,8 +372,10 @@ export const getCapsuleById = async (req: Request, res: Response) => {
       });
     }
 
-    // Find capsule
-    const capsule = await Capsule.findById(id)
+    const capsule = await Capsule.findOne({
+      _id: id,
+      deletedAt: null,
+    })
       .populate('creator', 'username firstName lastName avatar')
       .populate('collaborators', 'username firstName lastName avatar')
       .select('-unlockPassword'); // Never expose passwords
@@ -405,7 +387,6 @@ export const getCapsuleById = async (req: Request, res: Response) => {
       });
     }
 
-    // Check permissions
     const isCreator = capsule.creator._id.toString() === userId;
     const isCollaborator = capsule.collaborators.some(
       (collab: any) => collab._id.toString() === userId
@@ -419,7 +400,6 @@ export const getCapsuleById = async (req: Request, res: Response) => {
       });
     }
 
-    // Prepare response data based on permissions and capsule status
     let responseData: any = {
       _id: capsule._id,
       title: capsule.title,
@@ -510,9 +490,9 @@ export const getMyCapsules = async (req: Request, res: Response) => {
     const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    // Build filter for user's capsules
     const filter: any = {
       creator: new mongoose.Types.ObjectId(userId),
+      deletedAt: null,
     };
 
     if (status) filter.status = status;
@@ -558,3 +538,85 @@ export const getMyCapsules = async (req: Request, res: Response) => {
   }
 };
 
+export const deleteCapsule = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    const { confirm } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
+
+    if (confirm !== 'true') {
+      return res.status(400).json({
+        success: false,
+        message: 'Confirmation required. Add ?confirm=true to your request',
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid capsule ID',
+      });
+    }
+
+    const capsule = await Capsule.findOne({
+      _id: id,
+      deletedAt: null,
+    });
+
+    if (!capsule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Capsule not found or already deleted',
+      });
+    }
+
+    if (capsule.creator.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only capsule creator can delete this capsule',
+      });
+    }
+
+    capsule.deletedAt = new Date();
+    await capsule.save();
+
+    await Promise.all([
+      Media.updateMany(
+        { _id: { $in: capsule.content.mediaFiles } },
+        { $set: { deletedAt: new Date() } }
+      ),
+
+      /* Comment.updateMany(
+        { capsule: capsule._id },
+        { $set: { deletedAt: new Date() } }
+      ),
+       */
+
+      User.findByIdAndUpdate(userId, {
+        $inc: { 'stats.capsulesCreated': -1 },
+      }),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: 'Capsule deleted successfully',
+      data: {
+        deletedAt: capsule.deletedAt,
+      },
+    });
+  } catch (error) {
+    console.error('Delete capsule error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
