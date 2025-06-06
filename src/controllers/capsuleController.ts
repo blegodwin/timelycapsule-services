@@ -40,6 +40,23 @@ interface CapsuleQuery {
   sortOrder?: 'asc' | 'desc';
 }
 
+interface UpdateCapsuleRequest {
+  title?: string;
+  description?: string;
+  visibility?: 'private' | 'public' | 'unlisted';
+  category?: string;
+  tags?: string[];
+  unlockDate?: string;
+  unlockPassword?: string;
+  passwordHint?: string;
+  unlockLocation?: {
+    coordinates: [number, number];
+    radius?: number;
+    address?: string;
+  };
+  collaborators?: string[];
+  maxCollaborators?: number;
+}
 export const createCapsule = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -620,24 +637,6 @@ export const deleteCapsule = async (req: Request, res: Response) => {
     });
   }
 };
-
-interface UpdateCapsuleRequest {
-  title?: string;
-  description?: string;
-  visibility?: 'private' | 'public' | 'unlisted';
-  category?: string;
-  tags?: string[];
-  unlockDate?: string;
-  unlockPassword?: string;
-  passwordHint?: string;
-  unlockLocation?: {
-    coordinates: [number, number];
-    radius?: number;
-    address?: string;
-  };
-  collaborators?: string[];
-  maxCollaborators?: number;
-}
 
 export const updateCapsule = async (req: Request, res: Response) => {
   try {
