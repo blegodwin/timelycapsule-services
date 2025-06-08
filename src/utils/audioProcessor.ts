@@ -15,14 +15,11 @@ export const processAudio = async (media: any) => {
   const tempOutput = path.join(tempDir, `${media._id}-processed.mp3`);
 
   try {
-    // Ensure temp directory exists
     await mkdir(tempDir, { recursive: true });
 
-    // Download original
     const buffer = await downloadFromCloud(media.filePath);
     fs.writeFileSync(tempInput, buffer);
 
-    // Process audio
     await new Promise((resolve, reject) => {
       ffmpeg(tempInput)
         .audioCodec('libmp3lame')
@@ -34,7 +31,6 @@ export const processAudio = async (media: any) => {
         .run();
     });
 
-    // Upload processed file
     const processedKey = `processed/${media._id}.mp3`;
     await uploadToCloud(
       fs.readFileSync(tempOutput),
@@ -42,13 +38,10 @@ export const processAudio = async (media: any) => {
       'audio/mpeg'
     );
 
-    // Update media record
     media.filePath = processedKey;
 
-    // Extract metadata
     media.metadata = await getAudioMetadata(tempOutput);
 
-    // Cleanup
     await unlink(tempInput);
     await unlink(tempOutput);
 

@@ -16,14 +16,11 @@ export const processVideo = async (media: any) => {
   const tempThumbnail = path.join(tempDir, `${media._id}-thumbnail.jpg`);
 
   try {
-    // Ensure temp directory exists
     await mkdir(tempDir, { recursive: true });
 
-    // Download original
     const buffer = await downloadFromCloud(media.filePath);
     fs.writeFileSync(tempInput, buffer);
 
-    // Process video
     await new Promise((resolve, reject) => {
       ffmpeg(tempInput)
         .outputOptions([
@@ -40,7 +37,6 @@ export const processVideo = async (media: any) => {
         .run();
     });
 
-    // Generate thumbnail
     await new Promise((resolve, reject) => {
       ffmpeg(tempInput)
         .screenshots({
@@ -53,7 +49,6 @@ export const processVideo = async (media: any) => {
         .on('error', reject);
     });
 
-    // Upload processed files
     const processedKey = `processed/${media._id}.mp4`;
     const thumbnailKey = `thumbnails/${media._id}.jpg`;
 
@@ -64,14 +59,11 @@ export const processVideo = async (media: any) => {
       'image/jpeg'
     );
 
-    // Update media record
     media.filePath = processedKey;
     media.thumbnail = thumbnailKey;
 
-    // Extract metadata
     media.metadata = await getVideoMetadata(tempOutput);
 
-    // Cleanup
     await unlink(tempInput);
     await unlink(tempOutput);
     await unlink(tempThumbnail);
