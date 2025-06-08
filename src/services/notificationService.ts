@@ -1,6 +1,5 @@
-
-import { Notification } from '../models/Notification';
-import { User } from '../models/User';
+import { Notification } from '../model/Notification';
+import { User } from '../model/User';
 
 export const sendResponseNotification = async (
   inviterId: string,
