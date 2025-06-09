@@ -78,6 +78,8 @@ const CapsuleSchema = new mongoose.Schema<ICapsule>(
       type: Date,
       default: Date.now,
     },
+    contributions: mongoose.Types.ObjectId[];
+    approvedContributions: mongoose.Types.ObjectId[];
   },
   {
     timestamps: true,
@@ -85,6 +87,19 @@ const CapsuleSchema = new mongoose.Schema<ICapsule>(
     toObject: { virtuals: true },
   }
 );
+
+
+
+
+
+contributions: [{
+  type: Schema.Types.ObjectId,
+  ref: 'Contribution',
+}],
+approvedContributions: [{
+  type: Schema.Types.ObjectId,
+  ref: 'Contribution',
+}],
 
 interface ICapsuleMethods {
   isExpired(): boolean;
@@ -98,7 +113,7 @@ interface CapsuleModel extends Model<ICapsule, object, ICapsuleMethods> {
   findPublicCapsules(): Promise<ICapsule[]>;
 }
 
-// Instance methods
+
 CapsuleSchema.methods.isExpired = function (): boolean {
   if (!this.expirationDate) return false;
   return new Date() > this.expirationDate;
@@ -121,7 +136,6 @@ CapsuleSchema.methods.updateStatus = async function (): Promise<void> {
   console.log("Status updated to:", this.status); // Added logging
 };
 
-// Static methods
 CapsuleSchema.statics.findByRecipientEmail = function (email: string) {
   return this.find({ recipientEmail: email });
 };
@@ -133,20 +147,6 @@ CapsuleSchema.statics.findByCreator = function (userId: Types.ObjectId) {
 CapsuleSchema.statics.findPublicCapsules = function () {
   return this.find({ isPublic: true });
 };
-
-
-contributions: mongoose.Types.ObjectId[];
-approvedContributions: mongoose.Types.ObjectId[];
-
-
-contributions: [{
-  type: Schema.Types.ObjectId,
-  ref: 'Contribution',
-}],
-approvedContributions: [{
-  type: Schema.Types.ObjectId,
-  ref: 'Contribution',
-}],
 
 
 CapsuleSchema.pre<ICapsule>("save", function (next) {
