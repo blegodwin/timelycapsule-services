@@ -6,12 +6,12 @@ interface ICapsule extends ICapsuleMethods {
   creator: Types.ObjectId;
   recipients: Types.ObjectId[];
   unlockDate: Date;
-  expirationDate?: Date; // Optional
+  expirationDate?: Date; 
   mediaUrls: string[];
   message: string;
-  theme?: string; // Optional themes/templates
+  theme?: string; 
   isPublic: boolean;
-  password?: string; // Optional password protection
+  password?: string; 
   status: "Pending" | "Unlocked" | "Expired";
   recipientEmail: string;
   capsuleLink: string;
@@ -134,7 +134,21 @@ CapsuleSchema.statics.findPublicCapsules = function () {
   return this.find({ isPublic: true });
 };
 
-// Middleware to update status before saving
+
+contributions: mongoose.Types.ObjectId[];
+approvedContributions: mongoose.Types.ObjectId[];
+
+
+contributions: [{
+  type: Schema.Types.ObjectId,
+  ref: 'Contribution',
+}],
+approvedContributions: [{
+  type: Schema.Types.ObjectId,
+  ref: 'Contribution',
+}],
+
+
 CapsuleSchema.pre<ICapsule>("save", function (next) {
   if (this.isExpired()) {
     this.status = "Expired";
